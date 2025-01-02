@@ -32,7 +32,7 @@ jobs:
 
       - name: Set docker tag label for pull requests
         if: startsWith(github.ref, 'refs/pull/')
-        run: echo "TAGS=p${{ secrets.DOCKER_USERNAME }}/go-page-process:$( echo $GITHUB_REF | cut -d / -f 3 )" >> $GITHUB_ENV
+        run: echo "TAGS=p${{ secrets.DOCKER_USERNAME }}/go-page-process:pr$( echo $GITHUB_REF | cut -d / -f 3 )" >> $GITHUB_ENV
 
 
       - name: Log in to Docker Hub
