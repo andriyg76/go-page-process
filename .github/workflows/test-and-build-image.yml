@@ -18,7 +18,7 @@ jobs:
 
       - name: Set default docker tag label
         run: |
-          echo "TAG1=latest" >> $GITHUB_ENV |
+          echo "TAG1=latest" >> $GITHUB_ENV
           echo "TAG2=" >> $GITHUB_ENV
 
       - name: Set docker tag label for git branches
@@ -28,7 +28,7 @@ jobs:
       - name: Set docker tag label for git tags
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          echo "TAG1=${{ vars.DOCKER_USERNAME }}/go-page-process:$( echo $GITHUB_REF | cut -d / -f 3- )" >> $GITHUB_ENV |
+          echo "TAG1=${{ vars.DOCKER_USERNAME }}/go-page-process:$( echo $GITHUB_REF | cut -d / -f 3- )" >> $GITHUB_ENV
           echo "TAG2=${{ vars.DOCKER_USERNAME }}/go-page-process:$( echo $GITHUB_REF | cut -d / -f 3- | cut -d . -f 1-2 )" >> $GITHUB_ENV
 
       - name: Set docker tag label for pull requests
@@ -53,6 +53,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: |
-            ${{ env.TAG1 }} |
+            ${{ env.TAG1 }}
             ${{ env.TAG2 }}
           push: true
