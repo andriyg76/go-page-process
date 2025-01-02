@@ -2,9 +2,6 @@ name: Build multi-platform Docker image
  
 on:
   push:
-    branches:
-      - '**'
-      - '!**/dependabot/**'
     tags:
       - 'v*.*.*'
   pull_request:
