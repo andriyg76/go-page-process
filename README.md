@@ -51,7 +51,9 @@ To serve rendered pages over HTTP after processing:
 ```
 
 Serve mode does not render pages. Run the processor separately (for example in
-your build step) so the output directory already contains files.
+your build step) so the output directory already contains files. The server
+still reads the data directory to build route mappings, so keep `_page.output`
+values in sync with the files in the output directory.
 
 Options:
 
