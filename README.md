@@ -89,6 +89,24 @@ if err := proc.Process(); err != nil {
 }
 ```
 
+### Output URL listing
+
+If you embed a web server, you can build a route list from the generated output:
+
+```
+routes, err := proc.OutputRoutes()
+if err != nil {
+  // handle error
+}
+for _, route := range routes {
+  fmt.Printf("%s -> %s\n", route.URLPath, route.FilePath)
+}
+```
+
+`URLPath` is the request path. `FilePath` is output-relative and uses `/`
+separators (use `filepath.FromSlash` when opening files on disk). Routes
+include aliases for `index.html` (for example, `/` and `/docs/`).
+
 ## Data files (pages)
 
 Page data files live under the data directory. Supported formats are JSON

@@ -71,3 +71,51 @@ func TestProcessReturnsErrorOnMissingTemplate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestOutputRoutes(t *testing.T) {
+	root := t.TempDir()
+	config := DefaultConfig()
+	config.RootPath = root
+
+	proc := New(config)
+	outputDir := filepath.Join(root, config.OutputPath)
+
+	writeFile(t, filepath.Join(outputDir, "index.html"), "home")
+	writeFile(t, filepath.Join(outputDir, "assets", "app.js"), "console.log('hi')")
+	writeFile(t, filepath.Join(outputDir, "blog", "index.html"), "blog")
+	writeFile(t, filepath.Join(outputDir, "blog", "post.html"), "post")
+	writeFile(t, filepath.Join(outputDir, "robots.txt"), "robots")
+
+	routes, err := proc.OutputRoutes()
+	if err != nil {
+		t.Fatalf("output routes: %v", err)
+	}
+
+	got := make(map[string]string, len(routes))
+	for _, route := range routes {
+		got[route.URLPath] = route.FilePath
+	}
+	if len(routes) != len(got) {
+		t.Fatalf("expected unique routes, got %d entries with %d unique", len(routes), len(got))
+	}
+
+	want := map[string]string{
+		"/":                "index.html",
+		"/index.html":      "index.html",
+		"/assets/app.js":   "assets/app.js",
+		"/blog/":           "blog/index.html",
+		"/blog/index.html": "blog/index.html",
+		"/blog/post.html":  "blog/post.html",
+		"/robots.txt":      "robots.txt",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("unexpected route count: got %d want %d", len(got), len(want))
+	}
+
+	for urlPath, filePath := range want {
+		if got[urlPath] != filePath {
+			t.Fatalf("unexpected route %s: got %q want %q", urlPath, got[urlPath], filePath)
+		}
+	}
+}
