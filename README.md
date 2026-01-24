@@ -42,6 +42,14 @@ go build -o go-page-processor .
 All paths can be absolute or relative. Defaults match the layout above. Use
 `--root` to resolve relative paths from a single base directory.
 
+To serve rendered pages over HTTP after processing:
+
+```
+./go-page-processor --serve
+./go-page-processor --serve --port 9090
+./go-page-processor --serve --listen 127.0.0.1:9090
+```
+
 Options:
 
 - `-o, --output-path` (default: `pages`)
@@ -49,6 +57,9 @@ Options:
 - `-s, --shared-path` (default: `shared`)
 - `-t, --templates-path` (default: `.processor/templates`)
 - `-r, --root` (default: current working directory)
+- `--serve` (start HTTP server after rendering)
+- `-p, --port` (default: `8080`, ignored if `--listen` is set)
+- `-l, --listen` (listen address `host:port`, overrides `--port`)
 
 Run `./go-page-processor --help` to see all flags.
 
@@ -71,6 +82,9 @@ All options have short and long forms:
 - `-t, --templates-path` - Templates directory (default: `.processor/templates`)
 - `-r, --root` - Base directory for resolving relative paths (default: current
   working directory)
+- `--serve` - Start HTTP server after rendering
+- `-p, --port` - Port for `--serve` (default: `8080`, ignored if `--listen` is set)
+- `-l, --listen` - Listen address `host:port`, overrides `--port`
 - `-h, --help` - Display help
 
 ## Usage (API)

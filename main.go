@@ -11,17 +11,27 @@ import (
 )
 
 func main() {
-	config := parseArgs()
+	config, serve := parseArgs()
 	log.Info("Parsed arguments: %+v\n", config)
+	if serve.Enabled {
+		log.Info("Serve enabled (port=%d, listen=%q)\n", serve.Port, serve.Listen)
+	}
 	proc := processor.New(config)
 	if err := proc.Process(); err != nil {
 		log.Error("Processing failed: %v", err)
 		os.Exit(1)
 	}
+	if serve.Enabled {
+		if err := serveOutput(proc, serve); err != nil {
+			log.Error("Serve failed: %v", err)
+			os.Exit(1)
+		}
+	}
 }
 
-func parseArgs() processor.Config {
+func parseArgs() (processor.Config, serveOptions) {
 	config := processor.DefaultConfig()
+	serve := serveOptions{Port: 8080}
 	help := false
 
 	flag.StringVar(&config.OutputPath, "output-path", config.OutputPath, "directory where pages will be written, by default [pages]")
@@ -34,6 +44,11 @@ func parseArgs() processor.Config {
 	flag.StringVar(&config.TemplatesPath, "t", config.TemplatesPath, "short for --templates-path")
 	flag.StringVar(&config.RootPath, "root", config.RootPath, "base directory for relative paths, by default current working directory")
 	flag.StringVar(&config.RootPath, "r", config.RootPath, "short for --root")
+	flag.BoolVar(&serve.Enabled, "serve", serve.Enabled, "start HTTP server after rendering")
+	flag.IntVar(&serve.Port, "port", serve.Port, "port for --serve (default: 8080)")
+	flag.IntVar(&serve.Port, "p", serve.Port, "short for --port")
+	flag.StringVar(&serve.Listen, "listen", serve.Listen, "listen address (host:port) overrides --port")
+	flag.StringVar(&serve.Listen, "l", serve.Listen, "short for --listen")
 	flag.BoolVar(&help, "help", false, "Display help")
 	flag.BoolVar(&help, "h", false, "Display help")
 
@@ -45,6 +60,9 @@ func parseArgs() processor.Config {
 		fmt.Fprintf(output, "  -s, --shared-path      Shared data directory (default: %s)\n", config.SharedPath)
 		fmt.Fprintf(output, "  -t, --templates-path   Templates directory (default: %s)\n", config.TemplatesPath)
 		fmt.Fprintln(output, "  -r, --root             Base directory for relative paths (default: current working directory)")
+		fmt.Fprintln(output, "      --serve            Start HTTP server after rendering")
+		fmt.Fprintln(output, "  -p, --port             Port for --serve (default: 8080)")
+		fmt.Fprintln(output, "  -l, --listen           Listen address (host:port) overrides --port")
 		fmt.Fprintln(output, "  -h, --help             Display help")
 	}
 	flag.Parse()
@@ -54,5 +72,5 @@ func parseArgs() processor.Config {
 		os.Exit(0)
 	}
 
-	return config
+	return config, serve
 }
