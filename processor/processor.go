@@ -1,44 +1,80 @@
-package main
+package processor
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/BurntSushi/toml"
 	log "github.com/andriyg76/glog"
 	"github.com/aymerick/raymond"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
-type Processor struct {
-	OutputPath string
-	templates  map[string]*raymond.Template
+// Config describes where templates, data, and output live.
+type Config struct {
+	OutputPath    string
+	TemplatesPath string
+	SharedPath    string
+	DataPath      string
 }
 
-func NewProcessor(outputPath string) *Processor {
-	return &Processor{OutputPath: outputPath}
+// DefaultConfig returns the current default paths.
+func DefaultConfig() Config {
+	return Config{
+		OutputPath:    "pages",
+		TemplatesPath: filepath.Join(".processor", "templates"),
+		SharedPath:    "shared",
+		DataPath:      "data",
+	}
+}
+
+func (c Config) withDefaults() Config {
+	defaults := DefaultConfig()
+	if c.OutputPath == "" {
+		c.OutputPath = defaults.OutputPath
+	}
+	if c.TemplatesPath == "" {
+		c.TemplatesPath = defaults.TemplatesPath
+	}
+	if c.SharedPath == "" {
+		c.SharedPath = defaults.SharedPath
+	}
+	if c.DataPath == "" {
+		c.DataPath = defaults.DataPath
+	}
+	return c
+}
+
+// Processor renders pages using Handlebars templates and structured data.
+type Processor struct {
+	Config    Config
+	templates map[string]*raymond.Template
+}
+
+// New initializes a processor with the provided configuration.
+func New(config Config) *Processor {
+	return &Processor{Config: config.withDefaults()}
 }
 
 func (p *Processor) Process() {
 	log.Info("Loading templates...")
-	err, templates := loadTemplates()
+	templates, err := loadTemplates(p.Config.TemplatesPath)
 	if err != nil {
 		log.Error("Can't load templates: %v", err)
 		return
 	}
 	p.templates = templates
-	sharedPath := filepath.Join(".", "shared")
-	shared := p.loadShared(sharedPath)
-	dataDir := filepath.Join(".", "data")
-	log.Info("Navigating data directory: %s\n", dataDir)
-	p.convertPath(dataDir, shared)
+
+	shared := p.loadShared(p.Config.SharedPath)
+	log.Info("Navigating data directory: %s\n", p.Config.DataPath)
+	p.convertPath(p.Config.DataPath, shared)
 }
 
-func loadTemplates() (error, map[string]*raymond.Template) {
+func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
 	templates := map[string]*raymond.Template{}
-	partialsDir := filepath.Join(".processor", "templates")
-	err := filepath.Walk(partialsDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(templatesPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -47,7 +83,13 @@ func loadTemplates() (error, map[string]*raymond.Template) {
 			if err != nil {
 				return err
 			}
-			partialName := filepath.ToSlash(path[len(partialsDir)+1 : len(path)-len(filepath.Ext(path))])
+
+			relPath, err := filepath.Rel(templatesPath, path)
+			if err != nil {
+				return err
+			}
+			partialName := filepath.ToSlash(relPath[:len(relPath)-len(filepath.Ext(relPath))])
+
 			raymond.RegisterPartial(partialName, string(partialContent))
 			template, err := raymond.Parse(string(partialContent))
 			if err != nil {
@@ -59,9 +101,9 @@ func loadTemplates() (error, map[string]*raymond.Template) {
 		return nil
 	})
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, templates
+	return templates, nil
 }
 
 func (p *Processor) loadShared(path string) map[string]interface{} {
@@ -165,7 +207,7 @@ func (p *Processor) renderFile(file string, shared map[string]interface{}) {
 		output = output[1:]
 	}
 
-	outputPath := filepath.Join(p.OutputPath, output)
+	outputPath := filepath.Join(p.Config.OutputPath, output)
 	err := os.MkdirAll(filepath.Dir(outputPath), os.ModePerm)
 	if err != nil {
 		log.Info("Error creating directories for %s: %v\n", outputPath, err)

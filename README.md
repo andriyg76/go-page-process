@@ -39,7 +39,29 @@ go build -o go-page-processor .
 ./go-page-processor --output-path pages
 ```
 
+All paths can be absolute or relative. Defaults match the layout above.
+
+Options:
+
+- `-o, --output-path` (default: `pages`)
+- `-d, --data-path` (default: `data`)
+- `-s, --shared-path` (default: `shared`)
+- `-t, --templates-path` (default: `.processor/templates`)
+
 Run `./go-page-processor --help` to see all flags.
+
+## Usage (API)
+
+Embed the processor in another Go program:
+
+```
+import "go-page-process/processor"
+
+config := processor.DefaultConfig()
+config.OutputPath = "pages"
+proc := processor.New(config)
+proc.Process()
+```
 
 ## Usage (Docker)
 
