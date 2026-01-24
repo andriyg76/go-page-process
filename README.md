@@ -52,6 +52,15 @@ Options:
 
 Run `./go-page-processor --help` to see all flags.
 
+The CLI exits non-zero if processing fails (for example, missing templates or
+data parse errors).
+
+Example using a custom root directory:
+
+```
+./go-page-processor --root /path/to/site --output-path build
+```
+
 ## Usage (API)
 
 Embed the processor in another Go program:
@@ -61,6 +70,7 @@ import "go-page-process/processor"
 
 config := processor.DefaultConfig()
 config.OutputPath = "pages"
+config.RootPath = "/path/to/site"
 proc := processor.New(config)
 if err := proc.Process(); err != nil {
   // handle error
