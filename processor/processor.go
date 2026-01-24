@@ -2,6 +2,8 @@ package processor
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,6 +20,7 @@ type Config struct {
 	TemplatesPath string
 	SharedPath    string
 	DataPath      string
+	RootPath      string
 }
 
 // DefaultConfig returns the current default paths.
@@ -27,6 +30,7 @@ func DefaultConfig() Config {
 		TemplatesPath: filepath.Join(".processor", "templates"),
 		SharedPath:    "shared",
 		DataPath:      "data",
+		RootPath:      "",
 	}
 }
 
@@ -44,7 +48,29 @@ func (c Config) withDefaults() Config {
 	if c.DataPath == "" {
 		c.DataPath = defaults.DataPath
 	}
+	if c.RootPath == "" {
+		c.RootPath = defaults.RootPath
+	}
 	return c
+}
+
+func (c Config) resolvePaths() Config {
+	if c.RootPath == "" {
+		return c
+	}
+
+	c.OutputPath = resolvePath(c.RootPath, c.OutputPath)
+	c.TemplatesPath = resolvePath(c.RootPath, c.TemplatesPath)
+	c.SharedPath = resolvePath(c.RootPath, c.SharedPath)
+	c.DataPath = resolvePath(c.RootPath, c.DataPath)
+	return c
+}
+
+func resolvePath(root, path string) string {
+	if path == "" || filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(root, path)
 }
 
 // Processor renders pages using Handlebars templates and structured data.
@@ -55,21 +81,21 @@ type Processor struct {
 
 // New initializes a processor with the provided configuration.
 func New(config Config) *Processor {
-	return &Processor{Config: config.withDefaults()}
+	return &Processor{Config: config.withDefaults().resolvePaths()}
 }
 
-func (p *Processor) Process() {
+func (p *Processor) Process() error {
 	log.Info("Loading templates...")
 	templates, err := loadTemplates(p.Config.TemplatesPath)
 	if err != nil {
-		log.Error("Can't load templates: %v", err)
-		return
+		return err
 	}
 	p.templates = templates
 
-	shared := p.loadShared(p.Config.SharedPath)
+	shared, sharedErr := p.loadShared(p.Config.SharedPath)
 	log.Info("Navigating data directory: %s\n", p.Config.DataPath)
-	p.convertPath(p.Config.DataPath, shared)
+	dataErr := p.convertPath(p.Config.DataPath, shared)
+	return errors.Join(sharedErr, dataErr)
 }
 
 func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
@@ -106,38 +132,47 @@ func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
 	return templates, nil
 }
 
-func (p *Processor) loadShared(path string) map[string]interface{} {
+func (p *Processor) loadShared(path string) (map[string]interface{}, error) {
 	log.Info("Loading shared from %s\n", path)
 	shared := make(map[string]interface{})
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Info("Shared path is not found, ignoring loading\n")
-		return shared
+		return shared, nil
 	}
 
+	var errs []error
 	for _, file := range files {
 		if file.IsDir() {
-			shared[file.Name()] = p.loadShared(filepath.Join(path, file.Name()))
+			nested, err := p.loadShared(filepath.Join(path, file.Name()))
+			if err != nil {
+				errs = append(errs, err)
+			}
+			shared[file.Name()] = nested
 		} else {
 			prefix := p.prefix(file.Name())
-			content := p.loadFile(filepath.Join(path, file.Name()))
+			content, err := p.loadFile(filepath.Join(path, file.Name()))
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
 			if content != nil {
 				shared[prefix] = content
 			}
 		}
 	}
-	return shared
+	return shared, errors.Join(errs...)
 }
 
 func (p *Processor) prefix(name string) string {
 	return name[:len(name)-len(filepath.Ext(name))]
 }
 
-func (p *Processor) loadFile(file string) map[string]interface{} {
+func (p *Processor) loadFile(file string) (map[string]interface{}, error) {
 	content, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Info("Error reading file %s: %v\n", file, err)
-		return nil
+		return nil, err
 	}
 
 	var data map[string]interface{}
@@ -150,51 +185,60 @@ func (p *Processor) loadFile(file string) map[string]interface{} {
 		_, err = toml.Decode(string(content), &data)
 	default:
 		log.Info("Unknown file type %s\n", file)
-		return nil
+		return nil, nil
 	}
 
 	if err != nil {
 		log.Info("Error parsing file %s: %v\n", file, err)
-		return nil
+		return nil, err
 	}
-	return data
+	return data, nil
 }
 
-func (p *Processor) convertPath(path string, shared map[string]interface{}) {
+func (p *Processor) convertPath(path string, shared map[string]interface{}) error {
 	log.Info("Working with %s directory\n", path)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Info("Path %s does not exist or it is not a directory\n", path)
-		return
+		return err
 	}
 
+	var errs []error
 	for _, file := range files {
 		if file.IsDir() {
-			p.convertPath(filepath.Join(path, file.Name()), shared)
+			if err := p.convertPath(filepath.Join(path, file.Name()), shared); err != nil {
+				errs = append(errs, err)
+			}
 		} else {
-			p.renderFile(filepath.Join(path, file.Name()), shared)
+			if err := p.renderFile(filepath.Join(path, file.Name()), shared); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
+	return errors.Join(errs...)
 }
 
-func (p *Processor) renderFile(file string, shared map[string]interface{}) {
+func (p *Processor) renderFile(file string, shared map[string]interface{}) error {
 	log.Info("Rendering file %s\n", file)
-	data := p.loadFile(file)
+	data, err := p.loadFile(file)
+	if err != nil {
+		return err
+	}
 	if data == nil {
-		return
+		return nil
 	}
 
 	page, ok := data["_page"].(map[string]interface{})
 	if !ok {
 		log.Info("File %s does not contain _page directory\n", file)
-		return
+		return nil
 	}
 
 	data["_shared"] = shared
 	templateName, ok := page["template"].(string)
 	if !ok {
 		log.Info("File %s template is not defined\n", file)
-		return
+		return nil
 	}
 
 	output, ok := page["output"].(string)
@@ -203,32 +247,31 @@ func (p *Processor) renderFile(file string, shared map[string]interface{}) {
 		log.Info("File %s output is not defined\n", file)
 	}
 
-	if output[0] == '/' {
+	if output != "" && output[0] == '/' {
 		output = output[1:]
 	}
 
 	outputPath := filepath.Join(p.Config.OutputPath, output)
-	err := os.MkdirAll(filepath.Dir(outputPath), os.ModePerm)
+	err = os.MkdirAll(filepath.Dir(outputPath), os.ModePerm)
 	if err != nil {
 		log.Info("Error creating directories for %s: %v\n", outputPath, err)
-		return
+		return err
 	}
 
 	tmpl, ok := p.templates[templateName]
 	if !ok {
-		log.Error("Template %s: is not found", templateName)
-		return
+		return fmt.Errorf("template %s is not found", templateName)
 	}
 
 	result, err := tmpl.Exec(data)
 	if err != nil {
-		log.Error("Error executing template %s: %v\n", templateName, err)
-		return
+		return fmt.Errorf("execute template %s: %w", templateName, err)
 	}
 
 	log.Info("Writing output %s", outputPath)
 	err = ioutil.WriteFile(outputPath, []byte(result), os.ModePerm)
 	if err != nil {
-		log.Error("Error writing file %s: %v\n", outputPath, err)
+		return fmt.Errorf("write output %s: %w", outputPath, err)
 	}
+	return nil
 }

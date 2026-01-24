@@ -14,7 +14,10 @@ func main() {
 	config := parseArgs()
 	log.Info("Parsed arguments: %+v\n", config)
 	proc := processor.New(config)
-	proc.Process()
+	if err := proc.Process(); err != nil {
+		log.Error("Processing failed: %v", err)
+		os.Exit(1)
+	}
 }
 
 func parseArgs() processor.Config {
@@ -29,6 +32,8 @@ func parseArgs() processor.Config {
 	flag.StringVar(&config.SharedPath, "s", config.SharedPath, "short for --shared-path")
 	flag.StringVar(&config.TemplatesPath, "templates-path", config.TemplatesPath, "directory where templates are stored, by default [.processor/templates]")
 	flag.StringVar(&config.TemplatesPath, "t", config.TemplatesPath, "short for --templates-path")
+	flag.StringVar(&config.RootPath, "root", config.RootPath, "base directory for relative paths, by default current working directory")
+	flag.StringVar(&config.RootPath, "r", config.RootPath, "short for --root")
 	flag.BoolVar(&help, "help", false, "Display help")
 	flag.BoolVar(&help, "h", false, "Display help")
 
@@ -39,6 +44,7 @@ func parseArgs() processor.Config {
 		fmt.Fprintf(output, "  -d, --data-path        Data directory (default: %s)\n", config.DataPath)
 		fmt.Fprintf(output, "  -s, --shared-path      Shared data directory (default: %s)\n", config.SharedPath)
 		fmt.Fprintf(output, "  -t, --templates-path   Templates directory (default: %s)\n", config.TemplatesPath)
+		fmt.Fprintln(output, "  -r, --root             Base directory for relative paths (default: current working directory)")
 		fmt.Fprintln(output, "  -h, --help             Display help")
 	}
 	flag.Parse()
