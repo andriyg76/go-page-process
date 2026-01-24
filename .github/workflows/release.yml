@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: Version bump level
+        type: choice
+        required: false
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create version tag and release
+    runs-on: ubuntu-20.04
+    if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/release/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute next version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          level="${{ github.event.inputs.level }}"
+          if [ -z "$level" ]; then
+            level="patch"
+          fi
+
+          latest_tag="$(git tag --merged HEAD --list 'v*.*.*' --sort=-v:refname | head -n 1 || true)"
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v0.0.0"
+          fi
+
+          version="${latest_tag#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          case "$level" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+            *)
+              echo "Invalid level: $level" >&2
+              exit 1
+              ;;
+          esac
+
+          new_tag="v${major}.${minor}.${patch}"
+          if git rev-parse "$new_tag" >/dev/null 2>&1; then
+            echo "Tag already exists: $new_tag" >&2
+            exit 1
+          fi
+
+          echo "new_tag=$new_tag" >> "$GITHUB_OUTPUT"
+          if [ "$latest_tag" != "v0.0.0" ]; then
+            echo "prev_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          prev="${{ steps.version.outputs.prev_tag }}"
+          if [ -n "$prev" ]; then
+            echo "Changes since ${prev}" > release-notes.txt
+            echo "" >> release-notes.txt
+            git log --pretty=format:'- %s (%h)' "${prev}..HEAD" >> release-notes.txt
+          else
+            echo "Initial release" > release-notes.txt
+            echo "" >> release-notes.txt
+            git log --pretty=format:'- %s (%h)' >> release-notes.txt
+          fi
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -a "${{ steps.version.outputs.new_tag }}" -m "${{ steps.version.outputs.new_tag }}"
+          git push origin "${{ steps.version.outputs.new_tag }}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.new_tag }}" \
+            --title "${{ steps.version.outputs.new_tag }}" \
+            --notes-file release-notes.txt
