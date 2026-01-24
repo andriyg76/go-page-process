@@ -35,6 +35,11 @@ func main() {
 			log.Error("Serve failed: %v", err)
 			os.Exit(1)
 		}
+		return
+	}
+	if err := proc.Process(); err != nil {
+		log.Error("Processing failed: %v", err)
+		os.Exit(1)
 	}
 }
 

@@ -50,6 +50,9 @@ To serve rendered pages over HTTP after processing:
 ./go-page-processor --serve --listen 127.0.0.1:9090
 ```
 
+Serve mode does not render pages. Run the processor separately (for example in
+your build step) so the output directory already contains files.
+
 Options:
 
 - `-o, --output-path` (default: `pages`)
