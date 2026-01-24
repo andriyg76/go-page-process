@@ -39,7 +39,8 @@ go build -o go-page-processor .
 ./go-page-processor --output-path pages
 ```
 
-All paths can be absolute or relative. Defaults match the layout above.
+All paths can be absolute or relative. Defaults match the layout above. Use
+`--root` to resolve relative paths from a single base directory.
 
 Options:
 
@@ -47,6 +48,7 @@ Options:
 - `-d, --data-path` (default: `data`)
 - `-s, --shared-path` (default: `shared`)
 - `-t, --templates-path` (default: `.processor/templates`)
+- `-r, --root` (default: current working directory)
 
 Run `./go-page-processor --help` to see all flags.
 
@@ -60,7 +62,9 @@ import "go-page-process/processor"
 config := processor.DefaultConfig()
 config.OutputPath = "pages"
 proc := processor.New(config)
-proc.Process()
+if err := proc.Process(); err != nil {
+  // handle error
+}
 ```
 
 ## Usage (Docker)
