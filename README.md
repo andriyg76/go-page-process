@@ -78,7 +78,7 @@ All options have short and long forms:
 Embed the processor in another Go program:
 
 ```
-import "go-page-process/processor"
+import "github.com/andriyg76/go-page-process/processor"
 
 config := processor.DefaultConfig()
 config.OutputPath = "pages"

@@ -1,4 +1,4 @@
-module go-page-process
+module github.com/andriyg76/go-page-process
 
 go 1.23
 

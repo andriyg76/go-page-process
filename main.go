@@ -7,7 +7,7 @@ import (
 
 	log "github.com/andriyg76/glog"
 
-	"go-page-process/processor"
+	"github.com/andriyg76/go-page-process/processor"
 )
 
 func main() {
