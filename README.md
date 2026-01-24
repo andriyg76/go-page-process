@@ -124,6 +124,40 @@ for _, route := range routes {
 separators (use `filepath.FromSlash` when opening files on disk). Routes
 include aliases for `index.html` (for example, `/` and `/docs/`).
 
+### Embedded HTTP server
+
+You can embed a server in another application:
+
+```
+import (
+  "context"
+
+  "github.com/andriyg76/go-page-process/server"
+)
+
+srv, err := server.New(proc, server.Options{Port: 8080})
+if err != nil {
+  // handle error
+}
+if err := srv.Start(); err != nil {
+  // handle error
+}
+defer srv.Stop(context.Background())
+
+// Reload routes after data changes.
+if err := srv.Reload(); err != nil {
+  // handle error
+}
+
+// Restart with a full stop/start cycle.
+if err := srv.Restart(context.Background()); err != nil {
+  // handle error
+}
+```
+
+`Serve()` is also available to block the current goroutine until the server
+stops.
+
 ## Data files (pages)
 
 Page data files live under the data directory. Supported formats are JSON

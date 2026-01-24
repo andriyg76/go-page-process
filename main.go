@@ -8,6 +8,7 @@ import (
 	log "github.com/andriyg76/glog"
 
 	"github.com/andriyg76/go-page-process/processor"
+	"github.com/andriyg76/go-page-process/server"
 )
 
 func main() {
@@ -22,16 +23,30 @@ func main() {
 		os.Exit(1)
 	}
 	if serve.Enabled {
-		if err := serveOutput(proc, serve); err != nil {
+		srv, err := server.New(proc, server.Options{
+			Port:   serve.Port,
+			Listen: serve.Listen,
+		})
+		if err != nil {
+			log.Error("Serve setup failed: %v", err)
+			os.Exit(1)
+		}
+		if err := srv.Serve(); err != nil {
 			log.Error("Serve failed: %v", err)
 			os.Exit(1)
 		}
 	}
 }
 
-func parseArgs() (processor.Config, serveOptions) {
+type serveArgs struct {
+	Enabled bool
+	Port    int
+	Listen  string
+}
+
+func parseArgs() (processor.Config, serveArgs) {
 	config := processor.DefaultConfig()
-	serve := serveOptions{Port: 8080}
+	serve := serveArgs{Port: 8080}
 	help := false
 
 	flag.StringVar(&config.OutputPath, "output-path", config.OutputPath, "directory where pages will be written, by default [pages]")
