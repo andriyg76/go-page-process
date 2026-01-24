@@ -91,7 +91,10 @@ if err := proc.Process(); err != nil {
 
 ### Output URL listing
 
-If you embed a web server, you can build a route list from the generated output:
+If you embed a web server, you can build a route list from the page data
+directory. Routes are derived from `_page.output` (or the data file name when
+omitted) and match the paths the processor will render. Entries without a
+`_page.template` are ignored, matching processor behavior:
 
 ```
 routes, err := proc.OutputRoutes()

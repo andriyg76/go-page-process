@@ -78,13 +78,16 @@ func TestOutputRoutes(t *testing.T) {
 	config.RootPath = root
 
 	proc := New(config)
-	outputDir := filepath.Join(root, config.OutputPath)
+	dataDir := filepath.Join(root, config.DataPath)
 
-	writeFile(t, filepath.Join(outputDir, "index.html"), "home")
-	writeFile(t, filepath.Join(outputDir, "assets", "app.js"), "console.log('hi')")
-	writeFile(t, filepath.Join(outputDir, "blog", "index.html"), "blog")
-	writeFile(t, filepath.Join(outputDir, "blog", "post.html"), "post")
-	writeFile(t, filepath.Join(outputDir, "robots.txt"), "robots")
+	writeFile(t, filepath.Join(dataDir, "index.json"), `{"_page":{"template":"page","output":"index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "assets", "app.json"), `{"_page":{"template":"page","output":"assets/app.js"}}`)
+	writeFile(t, filepath.Join(dataDir, "blog", "index.json"), `{"_page":{"template":"page","output":"blog/index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "blog", "post.json"), `{"_page":{"template":"page","output":"blog/post.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "robots.json"), `{"_page":{"template":"page","output":"robots.txt"}}`)
+	writeFile(t, filepath.Join(dataDir, "draft.json"), `{"_page":{"template":"page"}}`)
+	writeFile(t, filepath.Join(dataDir, "docs.json"), `{"_page":{"template":"page","output":"/docs/index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "skip.json"), `{"_page":{"output":"skip.html"}}`)
 
 	routes, err := proc.OutputRoutes()
 	if err != nil {
@@ -106,6 +109,9 @@ func TestOutputRoutes(t *testing.T) {
 		"/blog/":           "blog/index.html",
 		"/blog/index.html": "blog/index.html",
 		"/blog/post.html":  "blog/post.html",
+		"/docs/":           "docs/index.html",
+		"/docs/index.html": "docs/index.html",
+		"/draft.json":      "draft.json",
 		"/robots.txt":      "robots.txt",
 	}
 

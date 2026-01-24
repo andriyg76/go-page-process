@@ -15,22 +15,23 @@ type OutputRoute struct {
 	FilePath string
 }
 
-// OutputRoutes scans the output directory and returns URL routes to serve.
+// OutputRoutes scans the data directory and returns URL routes to serve.
+// Routes are derived from _page.output and require _page.template.
 // It includes aliases for index.html files ("/" and "/section/").
 func (p *Processor) OutputRoutes() ([]OutputRoute, error) {
 	if p == nil {
 		return nil, fmt.Errorf("processor is nil")
 	}
-	return collectOutputRoutes(p.Config.OutputPath)
+	return collectOutputRoutesFromData(p, p.Config.DataPath)
 }
 
-func collectOutputRoutes(outputPath string) ([]OutputRoute, error) {
-	if outputPath == "" {
-		return nil, fmt.Errorf("output path is empty")
+func collectOutputRoutesFromData(p *Processor, dataPath string) ([]OutputRoute, error) {
+	if dataPath == "" {
+		return nil, fmt.Errorf("data path is empty")
 	}
 
 	routes := make(map[string]OutputRoute)
-	err := filepath.Walk(outputPath, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dataPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -38,17 +39,30 @@ func collectOutputRoutes(outputPath string) ([]OutputRoute, error) {
 			return nil
 		}
 
-		rel, err := filepath.Rel(outputPath, path)
+		data, err := p.loadFile(path)
 		if err != nil {
 			return err
 		}
-		rel = filepath.ToSlash(rel)
-		urlPath := "/" + rel
-		addRoute(routes, urlPath, rel)
+		if data == nil {
+			return nil
+		}
+
+		page, ok := data["_page"].(map[string]interface{})
+		if !ok {
+			return nil
+		}
+
+		output, ok := pageOutputPath(path, page)
+		if !ok {
+			return nil
+		}
+
+		urlPath := "/" + output
+		addRoute(routes, urlPath, output)
 
 		if strings.HasSuffix(urlPath, "/index.html") {
 			alias := strings.TrimSuffix(urlPath, "index.html")
-			addRoute(routes, alias, rel)
+			addRoute(routes, alias, output)
 		}
 		return nil
 	})
@@ -64,6 +78,28 @@ func collectOutputRoutes(outputPath string) ([]OutputRoute, error) {
 		return output[i].URLPath < output[j].URLPath
 	})
 	return output, nil
+}
+
+func pageOutputPath(filePath string, page map[string]interface{}) (string, bool) {
+	templateName, ok := page["template"].(string)
+	if !ok || templateName == "" {
+		return "", false
+	}
+
+	output, ok := page["output"].(string)
+	if !ok || output == "" {
+		output = filepath.Base(filePath)
+	}
+
+	output = filepath.ToSlash(output)
+	if strings.HasPrefix(output, "/") {
+		output = output[1:]
+	}
+	if output == "" {
+		return "", false
+	}
+
+	return output, true
 }
 
 func addRoute(routes map[string]OutputRoute, urlPath, filePath string) {
