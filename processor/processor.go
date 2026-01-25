@@ -116,11 +116,12 @@ func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
 			}
 			partialName := filepath.ToSlash(relPath[:len(relPath)-len(filepath.Ext(relPath))])
 
-			raymond.RegisterPartial(partialName, string(partialContent))
 			template, err := raymond.Parse(string(partialContent))
 			if err != nil {
 				return err
 			}
+			registerSpecHelpers(template)
+			raymond.RegisterPartialTemplate(partialName, template)
 			templates[partialName] = template
 			log.Info("Template %s loaded...", partialName)
 		}
