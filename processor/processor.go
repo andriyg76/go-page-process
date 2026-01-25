@@ -115,13 +115,15 @@ func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
 				return err
 			}
 			partialName := filepath.ToSlash(relPath[:len(relPath)-len(filepath.Ext(relPath))])
+			if _, exists := templates[partialName]; exists {
+				return fmt.Errorf("template %s is already loaded", partialName)
+			}
 
 			template, err := raymond.Parse(string(partialContent))
 			if err != nil {
 				return err
 			}
 			registerSpecHelpers(template)
-			raymond.RegisterPartialTemplate(partialName, template)
 			templates[partialName] = template
 			log.Info("Template %s loaded...", partialName)
 		}
@@ -129,6 +131,12 @@ func loadTemplates(templatesPath string) (map[string]*raymond.Template, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	for _, tmpl := range templates {
+		for partialName, partial := range templates {
+			tmpl.RegisterPartialTemplate(partialName, partial)
+		}
 	}
 	return templates, nil
 }
