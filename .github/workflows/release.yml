@@ -19,7 +19,7 @@ permissions:
 jobs:
   release:
     name: Create version tag and release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/heads/release/v')
     steps:
       - name: Checkout
