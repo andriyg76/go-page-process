@@ -71,3 +71,57 @@ func TestProcessReturnsErrorOnMissingTemplate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestOutputRoutes(t *testing.T) {
+	root := t.TempDir()
+	config := DefaultConfig()
+	config.RootPath = root
+
+	proc := New(config)
+	dataDir := filepath.Join(root, config.DataPath)
+
+	writeFile(t, filepath.Join(dataDir, "index.json"), `{"_page":{"template":"page","output":"index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "assets", "app.json"), `{"_page":{"template":"page","output":"assets/app.js"}}`)
+	writeFile(t, filepath.Join(dataDir, "blog", "index.json"), `{"_page":{"template":"page","output":"blog/index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "blog", "post.json"), `{"_page":{"template":"page","output":"blog/post.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "robots.json"), `{"_page":{"template":"page","output":"robots.txt"}}`)
+	writeFile(t, filepath.Join(dataDir, "draft.json"), `{"_page":{"template":"page"}}`)
+	writeFile(t, filepath.Join(dataDir, "docs.json"), `{"_page":{"template":"page","output":"/docs/index.html"}}`)
+	writeFile(t, filepath.Join(dataDir, "skip.json"), `{"_page":{"output":"skip.html"}}`)
+
+	routes, err := proc.OutputRoutes()
+	if err != nil {
+		t.Fatalf("output routes: %v", err)
+	}
+
+	got := make(map[string]string, len(routes))
+	for _, route := range routes {
+		got[route.URLPath] = route.FilePath
+	}
+	if len(routes) != len(got) {
+		t.Fatalf("expected unique routes, got %d entries with %d unique", len(routes), len(got))
+	}
+
+	want := map[string]string{
+		"/":                "index.html",
+		"/index.html":      "index.html",
+		"/assets/app.js":   "assets/app.js",
+		"/blog/":           "blog/index.html",
+		"/blog/index.html": "blog/index.html",
+		"/blog/post.html":  "blog/post.html",
+		"/docs/":           "docs/index.html",
+		"/docs/index.html": "docs/index.html",
+		"/draft.json":      "draft.json",
+		"/robots.txt":      "robots.txt",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("unexpected route count: got %d want %d", len(got), len(want))
+	}
+
+	for urlPath, filePath := range want {
+		if got[urlPath] != filePath {
+			t.Fatalf("unexpected route %s: got %q want %q", urlPath, got[urlPath], filePath)
+		}
+	}
+}

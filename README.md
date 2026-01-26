@@ -42,6 +42,19 @@ go build -o go-page-processor .
 All paths can be absolute or relative. Defaults match the layout above. Use
 `--root` to resolve relative paths from a single base directory.
 
+To serve rendered pages over HTTP after processing:
+
+```
+./go-page-processor --serve
+./go-page-processor --serve --port 9090
+./go-page-processor --serve --listen 127.0.0.1:9090
+```
+
+Serve mode does not render pages. Run the processor separately (for example in
+your build step) so the output directory already contains files. The server
+still reads the data directory to build route mappings, so keep `_page.output`
+values in sync with the files in the output directory.
+
 Options:
 
 - `-o, --output-path` (default: `pages`)
@@ -49,6 +62,9 @@ Options:
 - `-s, --shared-path` (default: `shared`)
 - `-t, --templates-path` (default: `.processor/templates`)
 - `-r, --root` (default: current working directory)
+- `--serve` (start HTTP server after rendering)
+- `-p, --port` (default: `8080`, ignored if `--listen` is set)
+- `-l, --listen` (listen address `host:port`, overrides `--port`)
 
 Run `./go-page-processor --help` to see all flags.
 
@@ -71,6 +87,9 @@ All options have short and long forms:
 - `-t, --templates-path` - Templates directory (default: `.processor/templates`)
 - `-r, --root` - Base directory for resolving relative paths (default: current
   working directory)
+- `--serve` - Start HTTP server after rendering
+- `-p, --port` - Port for `--serve` (default: `8080`, ignored if `--listen` is set)
+- `-l, --listen` - Listen address `host:port`, overrides `--port`
 - `-h, --help` - Display help
 
 ## Usage (API)
@@ -88,6 +107,61 @@ if err := proc.Process(); err != nil {
   // handle error
 }
 ```
+
+### Output URL listing
+
+If you embed a web server, you can build a route list from the page data
+directory. Routes are derived from `_page.output` (or the data file name when
+omitted) and match the paths the processor will render. Entries without a
+`_page.template` are ignored, matching processor behavior:
+
+```
+routes, err := proc.OutputRoutes()
+if err != nil {
+  // handle error
+}
+for _, route := range routes {
+  fmt.Printf("%s -> %s\n", route.URLPath, route.FilePath)
+}
+```
+
+`URLPath` is the request path. `FilePath` is output-relative and uses `/`
+separators (use `filepath.FromSlash` when opening files on disk). Routes
+include aliases for `index.html` (for example, `/` and `/docs/`).
+
+### Embedded HTTP server
+
+You can embed a server in another application:
+
+```
+import (
+  "context"
+
+  "github.com/andriyg76/go-page-process/server"
+)
+
+srv, err := server.New(proc, server.Options{Port: 8080})
+if err != nil {
+  // handle error
+}
+if err := srv.Start(); err != nil {
+  // handle error
+}
+defer srv.Stop(context.Background())
+
+// Reload routes after data changes.
+if err := srv.Reload(); err != nil {
+  // handle error
+}
+
+// Restart with a full stop/start cycle.
+if err := srv.Restart(context.Background()); err != nil {
+  // handle error
+}
+```
+
+`Serve()` is also available to block the current goroutine until the server
+stops.
 
 ## Data files (pages)
 
