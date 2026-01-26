@@ -71,3 +71,32 @@ func TestProcessReturnsErrorOnMissingTemplate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestProcessIncludeZeroForJSONNumbers(t *testing.T) {
+	root := t.TempDir()
+	config := DefaultConfig()
+	config.RootPath = root
+
+	templatePath := filepath.Join(root, config.TemplatesPath, "page.hbs")
+	writeFile(t, templatePath, "{{#if count includeZero=true}}zero{{else}}nope{{/if}}")
+
+	dataPath := filepath.Join(root, config.DataPath, "index.json")
+	writeFile(t, dataPath, `{"_page":{"template":"page","output":"index.html"},"count":0}`)
+
+	proc := New(config)
+	if err := proc.Process(); err != nil {
+		t.Fatalf("process: %v", err)
+	}
+
+	outputPath := filepath.Join(root, config.OutputPath, "index.html")
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+
+	got := strings.TrimSpace(string(content))
+	want := "zero"
+	if got != want {
+		t.Fatalf("unexpected output: got %q want %q", got, want)
+	}
+}
